@@ -1,0 +1,511 @@
+<!doctype html>
+<html lang="en-IE">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Commutick</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Commutick shows live bus, Luas, DART and train times from the stop closest to you, right on your iPhone Home Screen and Lock Screen. Made in Dublin.">
+<meta property="og:image" content="https://commutick.com/img/icon.png">
+<meta property="og:title" content="Commutick — your next bus, at a glance">
+<meta property="og:description" content="Live bus, Luas and train times across Ireland, on your Home Screen and Lock Screen.">
+<link rel="icon" type="image/png" href="img/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Doto:wght@700;900&family=Familjen+Grotesk:wght@500;600;700&family=Hanken+Grotesk:wght@400;500;600&display=swap">
+<style>
+/* Layout: a night-time Dublin street. Navy ground, the amber dot-matrix of a real-time bus sign as the one loud element; everything else stays quiet. */
+:root{
+  color-scheme: dark;
+  --night:#0d1a2e;      /* page ground, from the app icon */
+  --navy:#152847;       /* raised surfaces */
+  --line:#253b61;       /* hairlines */
+  --paper:#eef2f8;      /* primary text */
+  --mute:#9cadc8;       /* secondary text */
+  --amber:#f7b500;      /* LED amber, the brand accent */
+  --amber-off:#3a3013;  /* unlit LED dot */
+  --led-bg:#0a0f18;
+  --f-display:"Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --f-body:"Hanken Grotesk", -apple-system, "Segoe UI", Roboto, sans-serif;
+  --f-led:"Doto", "Courier New", ui-monospace, monospace;
+  --wrap:1120px;
+}
+*{box-sizing:border-box}
+body{background:var(--night);color:var(--paper);font-family:var(--f-body);font-size:17px;line-height:1.6;-webkit-font-smoothing:antialiased}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--night)}
+a{color:inherit}
+:focus-visible{outline:2px solid var(--amber);outline-offset:3px;border-radius:6px}
+h1,h2,h3{font-family:var(--f-display);line-height:1.08;margin:0;text-wrap:balance;letter-spacing:-.02em}
+p{margin:0}
+.wrap{max-width:var(--wrap);margin:0 auto;padding-left:max(20px,env(safe-area-inset-left,0px));padding-right:max(20px,env(safe-area-inset-right,0px))}
+.eyebrow{font-size:13px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--amber)}
+.mute{color:var(--mute)}
+
+/* nav */
+header.nav{position:sticky;top:env(safe-area-inset-top,0px);z-index:9;background:color-mix(in srgb,var(--night) 86%,transparent);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid transparent;transition:border-color .2s}
+header.nav.scrolled{border-bottom-color:var(--line)}
+.nav .wrap{display:flex;align-items:center;gap:24px;padding-block:14px}
+.brand{display:flex;align-items:center;gap:10px;text-decoration:none;font-family:var(--f-display);font-weight:700;font-size:20px;letter-spacing:-.01em}
+.brand img{width:34px;height:34px;border-radius:9px}
+.nav nav{display:flex;gap:22px;margin-left:auto;font-size:15px}
+.nav nav a{text-decoration:none;color:var(--mute)}
+.nav nav a:hover{color:var(--paper)}
+@media (max-width:720px){.nav nav{display:none}.nav .store-btn{margin-left:auto}}
+
+/* store button */
+.store-btn{display:inline-flex;align-items:center;gap:10px;background:var(--paper);color:var(--night);text-decoration:none;border-radius:12px;padding:10px 18px 10px 14px;font-weight:600;line-height:1.15;transition:transform .15s}
+.store-btn:hover{transform:translateY(-1px)}
+.store-btn svg{width:22px;height:22px;flex:none}
+.store-btn small{display:block;font-size:11px;font-weight:500;opacity:.75}
+.store-btn span{font-size:16px}
+.store-btn.sm{padding:7px 14px 7px 11px;border-radius:10px}
+.store-btn.sm span{font-size:14px}
+.store-btn.sm small{font-size:10px}
+.store-btn[aria-disabled="true"]{cursor:default}
+.store-btn[aria-disabled="true"]:hover{transform:none}
+
+/* hero */
+.hero{padding-block:72px 40px;position:relative;overflow:hidden}
+.hero .wrap{display:grid;grid-template-columns:1.1fr .9fr;gap:56px;align-items:center}
+.hero h1{font-size:clamp(42px,6.2vw,76px);font-weight:700}
+.hero h1 em{font-style:normal;color:var(--amber)}
+.hero .lede{font-size:20px;color:var(--mute);margin-top:22px;max-width:30em}
+.hero .ctas{display:flex;flex-wrap:wrap;align-items:center;gap:18px;margin-top:34px}
+.hero .note{font-size:14px;color:var(--mute)}
+.hero .note b{color:var(--paper);font-weight:600}
+.hero-art{position:relative;display:flex;justify-content:center;min-width:0}
+
+/* LED sign */
+.sign{background:var(--led-bg);border-radius:14px;padding:16px 18px 14px;border:1px solid #1d2a40;box-shadow:0 1px 0 #ffffff10 inset,0 30px 60px -20px #000a,0 0 0 6px #111c2e;font-family:var(--f-led);color:var(--amber);text-shadow:0 0 8px #f7b50088;position:relative;
+  background-image:radial-gradient(var(--amber-off) 1px,transparent 1.4px);background-size:5px 5px}
+.sign-head{display:flex;justify-content:space-between;font-size:13px;font-weight:700;letter-spacing:.06em;opacity:.8;padding-bottom:8px;margin-bottom:6px;border-bottom:1px dashed #f7b50033}
+.sign-row{display:grid;grid-template-columns:2.9em 1fr auto;gap:10px;align-items:baseline;font-weight:900;font-size:clamp(20px,2.4vw,26px);line-height:1.5;font-variant-numeric:tabular-nums;white-space:nowrap}
+.sign-row .dest{overflow:hidden;text-overflow:ellipsis;font-weight:700}
+.sign-row .min{text-align:right;min-width:3.6em}
+.sign-row .min small{font-size:.6em;margin-left:2px}
+.sign-row.flash .min{animation:blink 1s steps(2) 3}
+@keyframes blink{50%{opacity:.15}}
+
+.hero-sign{position:absolute;left:-120px;bottom:40px;width:min(450px,100%);z-index:2}
+.phone{width:min(300px,78vw);aspect-ratio:600/1304;border-radius:46px;padding:9px;background:linear-gradient(145deg,#2a3c5c,#0b1424);box-shadow:0 50px 90px -30px #000c,0 0 0 1px #3a4f75 inset;position:relative;max-width:100%}
+.phone img{display:block;width:100%;height:100%;object-fit:cover;object-position:top;border-radius:38px;background:#f2f2f7}
+.glow{position:absolute;inset:auto -20% -30% -20%;height:70%;background:radial-gradient(closest-side,#f7b50022,transparent);pointer-events:none}
+@media (max-width:900px){
+  .hero .wrap{grid-template-columns:1fr;gap:40px}
+  .hero-sign{left:50%;transform:translateX(-50%);bottom:-10px;width:min(360px,100%)}
+  .hero-art{padding-bottom:40px}
+}
+
+/* modes strip */
+.modes{border-block:1px solid var(--line);margin-top:48px}
+.modes .wrap{display:flex;flex-wrap:wrap;gap:10px 34px;align-items:center;justify-content:space-between;padding-block:22px}
+.modes .label{font-size:14px;color:var(--mute)}
+.modes ul{display:flex;flex-wrap:wrap;gap:10px 28px;list-style:none;margin:0;padding:0;font-family:var(--f-display);font-weight:600;font-size:18px}
+.modes li{display:flex;align-items:center;gap:8px}
+.modes li i{width:8px;height:8px;border-radius:50%;background:var(--amber);box-shadow:0 0 8px var(--amber)}
+
+/* sections */
+section.block{padding-block:110px}
+.sec-head{max-width:640px;margin-bottom:56px}
+.sec-head h2{font-size:clamp(32px,4.4vw,52px);margin-top:12px}
+.sec-head p{margin-top:16px;font-size:19px;color:var(--mute)}
+
+/* feature rows */
+.feature{display:grid;grid-template-columns:1fr 1fr;gap:64px;align-items:center}
+.feature + .feature{margin-top:120px}
+.feature.rev .f-art{order:2}
+.f-copy{min-width:0}
+.f-copy h3{font-size:clamp(28px,3.2vw,40px)}
+.f-copy p{margin-top:16px;color:var(--mute);font-size:18px;max-width:30em}
+.f-copy ul{margin:22px 0 0;padding:0;list-style:none;display:grid;gap:10px}
+.f-copy li{display:flex;gap:12px;align-items:flex-start}
+.f-copy li::before{content:"";flex:none;width:7px;height:7px;margin-top:10px;border-radius:50%;background:var(--amber)}
+.pro-tag{display:inline-block;font-family:var(--f-body);font-size:12px;font-weight:600;letter-spacing:.08em;color:var(--night);background:var(--amber);border-radius:6px;padding:2px 7px;vertical-align:middle;margin-left:8px;position:relative;top:-3px}
+.f-art{display:flex;justify-content:center;min-width:0;position:relative}
+@media (max-width:860px){.feature{grid-template-columns:1fr;gap:40px}.feature.rev .f-art{order:0}.feature + .feature{margin-top:90px}}
+
+/* home screen widget mock */
+.homescreen{width:min(340px,100%);aspect-ratio:340/400;border-radius:36px;padding:22px;background:
+  radial-gradient(120% 80% at 0% 0%,#2f5e8c 0%,transparent 60%),radial-gradient(100% 80% at 100% 100%,#7b4a2a 0%,transparent 55%),#1b2b45;display:grid;grid-template-columns:repeat(4,1fr);grid-auto-rows:62px;gap:16px 14px;box-shadow:0 40px 80px -30px #000c;max-width:100%}
+.app{border-radius:15px;background:#ffffff1f}
+.app.a1{background:#ffffff2e}.app.a2{background:#ffffff14}
+.widget{grid-column:span 2;grid-row:span 2;border-radius:22px;background:#fbfbfd;color:#111;padding:13px 14px;display:flex;flex-direction:column;justify-content:space-between;font-family:-apple-system,"SF Pro Text",var(--f-body);box-shadow:0 8px 20px #0005}
+.widget .w-top{font-size:11px;font-weight:600;color:#8a8a8e;line-height:1.25}
+.widget .w-route{display:inline-block;background:#f7c600;color:#1a1a1a;border-radius:5px;font-weight:800;font-size:12px;padding:1px 6px;margin-right:5px}
+.widget .w-dest{font-size:13px;font-weight:700;margin-top:4px}
+.widget .w-min{font-size:34px;font-weight:700;line-height:1;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.widget .w-min small{font-size:15px;font-weight:600;margin-left:2px}
+.widget .w-then{font-size:11px;color:#8a8a8e;font-weight:500}
+.wide{grid-column:span 4}
+
+/* lock screen mock */
+.lock{width:min(320px,100%);aspect-ratio:320/560;border-radius:44px;overflow:hidden;position:relative;max-width:100%;
+  background:linear-gradient(180deg,#0f2a4a 0%,#1d3f63 45%,#3e5a72 75%,#8c7a63 100%);box-shadow:0 40px 80px -30px #000c;display:flex;flex-direction:column;align-items:center;padding:22px 14px;color:#fff;font-family:-apple-system,"SF Pro Display",var(--f-body)}
+.island{width:126px;height:34px;border-radius:20px;background:#000;display:flex;align-items:center;justify-content:space-between;padding:0 12px;font-size:12px;font-weight:700;font-variant-numeric:tabular-nums}
+.island .ir{color:var(--amber)}
+.lock .date{margin-top:26px;font-size:15px;font-weight:600;opacity:.85}
+.lock .clock{font-size:78px;font-weight:700;line-height:1;letter-spacing:-.02em;opacity:.95}
+.activity{margin-top:auto;width:100%;border-radius:22px;background:#1c1c1ecc;backdrop-filter:blur(10px);padding:14px 16px;display:grid;grid-template-columns:auto 1fr auto;gap:4px 12px;align-items:center}
+.activity .badge{grid-row:span 2;width:40px;height:40px;border-radius:11px;background:var(--amber);color:#111;display:grid;place-items:center;font-weight:800;font-size:16px}
+.activity .t1{font-size:13px;font-weight:600}
+.activity .t2{font-size:12px;opacity:.65}
+.activity .mins{grid-row:span 2;font-size:30px;font-weight:700;color:var(--amber);font-variant-numeric:tabular-nums}
+.activity .mins small{font-size:14px}
+.activity .bar{grid-column:1/-1;height:4px;border-radius:2px;background:#ffffff22;margin-top:8px;overflow:hidden}
+.activity .bar i{display:block;height:100%;width:62%;background:var(--amber);border-radius:2px;transition:width 1s linear}
+
+/* phones pair */
+.pair{display:flex;gap:18px;align-items:flex-end;justify-content:center}
+.pair .phone{width:min(240px,46%)}
+.pair .phone:first-child{transform:translateY(-30px)}
+
+/* steps */
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;counter-reset:s}
+.step{border:1px solid var(--line);border-radius:20px;padding:30px 28px;background:var(--navy);min-width:0}
+.step .n{font-family:var(--f-led);font-weight:900;font-size:44px;color:var(--amber);line-height:1;text-shadow:0 0 10px #f7b50066}
+.step h3{font-size:22px;margin-top:18px}
+.step p{margin-top:8px;color:var(--mute);font-size:16px}
+@media (max-width:820px){.steps{grid-template-columns:1fr}}
+
+/* pricing */
+.plans{display:grid;grid-template-columns:1fr 1fr;gap:20px;max-width:900px}
+.plan{border-radius:24px;padding:34px 32px;border:1px solid var(--line);min-width:0}
+.plan.pro{background:linear-gradient(160deg,#1f355b,#152847);border-color:#f7b50066;position:relative}
+.plan h3{font-size:26px;display:flex;align-items:center;gap:10px}
+.price{font-family:var(--f-display);font-size:48px;font-weight:700;margin-top:14px;letter-spacing:-.02em}
+.price small{font-size:17px;font-weight:500;color:var(--mute);letter-spacing:0}
+.plan .sub{color:var(--mute);font-size:15px;margin-top:4px}
+.plan ul{list-style:none;padding:0;margin:26px 0 0;display:grid;gap:12px;font-size:16px}
+.plan li{display:flex;gap:12px;align-items:flex-start}
+.plan li svg{flex:none;width:18px;height:18px;margin-top:4px;color:var(--amber)}
+.ribbon{position:absolute;top:-13px;right:26px;background:var(--amber);color:var(--night);font-weight:700;font-size:13px;border-radius:999px;padding:4px 12px}
+.plans-foot{margin-top:22px;color:var(--mute);font-size:15px}
+@media (max-width:760px){.plans{grid-template-columns:1fr}}
+
+/* faq */
+.faq{max-width:780px;display:grid;gap:0}
+.faq details{border-bottom:1px solid var(--line)}
+.faq summary{cursor:pointer;list-style:none;padding:22px 40px 22px 0;font-family:var(--f-display);font-weight:600;font-size:20px;position:relative}
+.faq summary::-webkit-details-marker{display:none}
+.faq summary::after{content:"+";position:absolute;right:4px;top:18px;font-size:28px;font-weight:400;color:var(--amber);transition:transform .2s}
+.faq details[open] summary::after{transform:rotate(45deg)}
+.faq details p{padding:0 0 24px;color:var(--mute);max-width:38em}
+
+/* closing */
+.closing{text-align:left}
+.closing .box{border-radius:28px;padding:56px clamp(24px,5vw,64px);background:var(--led-bg);border:1px solid #1d2a40;display:grid;grid-template-columns:1fr auto;gap:40px;align-items:center;
+  background-image:radial-gradient(#f7b5000f 1px,transparent 1.4px);background-size:6px 6px}
+.closing h2{font-size:clamp(30px,4vw,48px)}
+.closing h2 span{font-family:var(--f-led);font-weight:900;color:var(--amber);text-shadow:0 0 12px #f7b50077;letter-spacing:0}
+.closing p{color:var(--mute);margin-top:12px;font-size:18px}
+.closing img{width:120px;height:120px;border-radius:28px;box-shadow:0 20px 40px -10px #000c}
+@media (max-width:700px){.closing .box{grid-template-columns:1fr}.closing img{order:-1;width:84px;height:84px;border-radius:20px}}
+
+footer{border-top:1px solid var(--line);padding-block:40px 56px;color:var(--mute);font-size:14px}
+footer .wrap{display:flex;flex-wrap:wrap;gap:16px 40px;justify-content:space-between}
+footer nav{display:flex;flex-wrap:wrap;gap:8px 24px}
+footer a{text-decoration:none}
+footer a:hover{color:var(--paper)}
+footer .credit{flex-basis:100%;font-size:13px;opacity:.8}
+
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+<style>html,body{margin:0}img{max-width:100%}</style>
+</head>
+<body>
+
+
+<header class="nav" id="top">
+  <div class="wrap">
+    <a class="brand" href="#top"><img src="img/icon.png" alt="">Commutick</a>
+    <nav aria-label="Main">
+      <a href="#features">Features</a>
+      <a href="#how">How it works</a>
+      <a href="#pricing">Pricing</a>
+      <a href="#faq">FAQ</a>
+    </nav>
+    <a class="store-btn sm js-store" href="#download">
+      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.37 12.6c-.02-2.3 1.88-3.4 1.96-3.46-1.07-1.56-2.73-1.78-3.32-1.8-1.41-.14-2.76.83-3.48.83-.72 0-1.82-.81-3-.79-1.54.02-2.96.9-3.76 2.28-1.6 2.78-.41 6.9 1.15 9.16.76 1.1 1.67 2.34 2.86 2.3 1.15-.05 1.58-.74 2.97-.74 1.38 0 1.77.74 2.98.72 1.23-.02 2.01-1.12 2.76-2.23.87-1.28 1.23-2.52 1.25-2.58-.03-.01-2.4-.92-2.42-3.65zM14.1 5.86c.63-.77 1.06-1.83.94-2.89-.91.04-2.01.61-2.66 1.37-.58.67-1.09 1.75-.96 2.79 1.02.08 2.05-.52 2.68-1.27z"/></svg>
+      <span><small class="js-store-small">Download on the</small>App Store</span>
+    </a>
+  </div>
+</header>
+
+<main>
+<section class="hero">
+  <div class="wrap">
+    <div>
+      <p class="eyebrow">Live bus, Luas &amp; train times · Ireland</p>
+      <h1 style="margin-top:18px">Know when to leave. <em>Not just when it arrives.</em></h1>
+      <p class="lede">Commutick puts your next bus, Luas or train on your Home Screen and Lock Screen, from the stop closest to you. Set your commute once and it switches between morning and evening on its own.</p>
+      <div class="ctas">
+        <a class="store-btn js-store" href="#download">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.37 12.6c-.02-2.3 1.88-3.4 1.96-3.46-1.07-1.56-2.73-1.78-3.32-1.8-1.41-.14-2.76.83-3.48.83-.72 0-1.82-.81-3-.79-1.54.02-2.96.9-3.76 2.28-1.6 2.78-.41 6.9 1.15 9.16.76 1.1 1.67 2.34 2.86 2.3 1.15-.05 1.58-.74 2.97-.74 1.38 0 1.77.74 2.98.72 1.23-.02 2.01-1.12 2.76-2.23.87-1.28 1.23-2.52 1.25-2.58-.03-.01-2.4-.92-2.42-3.65zM14.1 5.86c.63-.77 1.06-1.83.94-2.89-.91.04-2.01.61-2.66 1.37-.58.67-1.09 1.75-.96 2.79 1.02.08 2.05-.52 2.68-1.27z"/></svg>
+          <span><small class="js-store-small">Download on the</small>App Store</span>
+        </a>
+        <p class="note"><b>First month of Pro free.</b><br>No ads. No account.</p>
+      </div>
+    </div>
+    <div class="hero-art">
+      <div class="phone"><img src="img/home.webp" alt="Commutick home screen showing the 27 to Jobstown in 19 minutes, a 582 metre walk to the stop, and the route on a map of Dublin"></div>
+      <div class="sign hero-sign" aria-label="Example live departures board">
+        <div class="sign-head"><span>CRUMLIN HOSPL</span><span id="sign-clock">08:12</span></div>
+        <div id="sign-rows"></div>
+      </div>
+      <div class="glow"></div>
+    </div>
+  </div>
+  <div class="modes">
+    <div class="wrap">
+      <p class="label">Real-time data from the National Transport Authority and TII</p>
+      <ul>
+        <li><i></i>Dublin Bus</li>
+        <li><i></i>Luas</li>
+        <li><i></i>DART</li>
+        <li><i></i>Commuter rail</li>
+        <li><i></i>Regional buses</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="features">
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="eyebrow">Features</p>
+      <h2>Your commute, already on screen when you pick up your phone.</h2>
+    </div>
+
+    <div class="feature">
+      <div class="f-art">
+        <div class="homescreen" aria-label="Illustration of the Commutick widget on an iPhone Home Screen">
+          <div class="widget">
+            <div class="w-top">Work · leave in 4 min</div>
+            <div>
+              <div class="w-dest"><span class="w-route">27</span>Jobstown</div>
+              <div class="w-min" id="w-min">11<small>min</small></div>
+            </div>
+            <div class="w-then">then 23, 41 min · 582 m</div>
+          </div>
+          <div class="app a1"></div><div class="app"></div>
+          <div class="app"></div><div class="app a2"></div>
+          <div class="app a2"></div><div class="app"></div><div class="app a1"></div><div class="app"></div>
+          <div class="app"></div><div class="app a1"></div><div class="app a2"></div><div class="app"></div>
+        </div>
+      </div>
+      <div class="f-copy">
+        <p class="eyebrow">Home Screen widget</p>
+        <h3 style="margin-top:12px">Check your bus without opening an app.</h3>
+        <p>The widget follows your day. In the morning it shows the way to work; in the evening it flips to the way home. It goes live about an hour around each departure time, so the battery stays happy.</p>
+        <ul>
+          <li>Small and medium sizes, plus a Lock Screen widget</li>
+          <li>Next three departures with live or scheduled times</li>
+          <li>Distance and walking time to your stop</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="feature rev">
+      <div class="f-art">
+        <div class="lock" aria-label="Illustration of a Commutick live countdown on the iPhone Lock Screen and Dynamic Island">
+          <div class="island"><span>27</span><span class="ir" id="isl-min">6 min</span></div>
+          <div class="date">Monday 2 November</div>
+          <div class="clock" id="lock-clock">08:14</div>
+          <div class="activity">
+            <div class="badge">27</div>
+            <div class="t1">Work · Crumlin Hospl</div>
+            <div class="mins" id="act-min">6<small> min</small></div>
+            <div class="t2">→ Jobstown · then 18 min</div>
+            <div class="bar"><i id="act-bar"></i></div>
+          </div>
+        </div>
+      </div>
+      <div class="f-copy">
+        <p class="eyebrow">Lock Screen &amp; Dynamic Island</p>
+        <h3 style="margin-top:12px">A live countdown, updated every minute.<span class="pro-tag">PRO</span></h3>
+        <p>Tap <b>Track on Lock Screen</b> and the countdown follows you while you finish your coffee. Turn on arrival alerts and Commutick taps you on the shoulder a few minutes before the bus pulls in.</p>
+        <ul>
+          <li>Live Activity on the Lock Screen and Dynamic Island</li>
+          <li>Alerts a few minutes before your bus arrives</li>
+          <li>Pushed from our server, so it keeps updating in your pocket</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="feature">
+      <div class="f-art">
+        <div class="pair">
+          <div class="phone"><img src="img/map.webp" alt="Commutick commute card with the 27 bus, a walking distance and a map of the route"></div>
+          <div class="phone"><img src="img/setup.webp" alt="Commutick setup screen: Home in Crumlin, Work in Artane, leaving at 08:00 and 20:30"></div>
+        </div>
+      </div>
+      <div class="f-copy">
+        <p class="eyebrow">Nearest stop, best route</p>
+        <h3 style="margin-top:12px">It picks the stop closest to you. And the bus that gets you there first.</h3>
+        <p>Tell Commutick where home and work are. It finds the stop you can actually walk to, shows how far it is, and recommends the route. Prefer your usual 27 or the Green Line? Choose it yourself.</p>
+        <ul>
+          <li>Bus, Luas, DART and train in one list</li>
+          <li>Faster routes with changes and total journey time <span class="pro-tag" style="top:-1px">PRO</span></li>
+          <li>Up to two commutes free: Work, School, College or Uni</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="how" style="background:linear-gradient(180deg,transparent,#0a1527 30%,#0a1527 70%,transparent)">
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="eyebrow">How it works</p>
+      <h2>Set it up once. About a minute.</h2>
+    </div>
+    <div class="steps">
+      <div class="step"><div class="n">1</div><h3>Add Home and Work</h3><p>Type an area or address. Rename Work to School, College or Uni if that suits you better.</p></div>
+      <div class="step"><div class="n">2</div><h3>Pick when you leave</h3><p>Set your morning and evening times and the days you travel. Commutick does the switching.</p></div>
+      <div class="step"><div class="n">3</div><h3>Add the widget</h3><p>Touch and hold your Home Screen, tap Edit, then Add Widget and search for Commutick.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="pricing">
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="eyebrow">Pricing</p>
+      <h2>Free to use. Pro for less than a bus fare a month.</h2>
+      <p>Every new user gets the first month of Pro free. No card, nothing to cancel. When it ends you keep the free version.</p>
+    </div>
+    <div class="plans">
+      <div class="plan">
+        <h3>Free</h3>
+        <div class="price">€0</div>
+        <p class="sub">Forever</p>
+        <ul>
+          <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M4 10.5l4 4 8-9"/></svg>Bus, Luas and train from your nearest stop</li>
+          <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M4 10.5l4 4 8-9"/></svg>Two commutes, switching automatically by time and place</li>
+          <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M4 10.5l4 4 8-9"/></svg>Home Screen and Lock Screen widgets</li>
+          <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M4 10.5l4 4 8-9"/></svg>Walking distance and when to head out</li>
+          <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M4 10.5l4 4 8-9"/></svg>Live for an hour around your departure times</li>
+        </ul>
+      </div>
+      <div class="plan pro">
+        <span class="ribbon">First month free</span>
+        <h3>Pro</h3>
+        <div class="price">€0.99 <small>/ month</small></div>
+        <p class="sub">Cancel any time in Settings</p>
+        <ul>
+          <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M4 10.5l4 4 8-9"/></svg>Everything in Free</li>
+          <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M4 10.5l4 4 8-9"/></svg>Live any time the app is open</li>
+          <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M4 10.5l4 4 8-9"/></svg>Countdown on the Lock Screen and Dynamic Island</li>
+          <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M4 10.5l4 4 8-9"/></svg>Alerts a few minutes before your bus arrives</li>
+          <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M4 10.5l4 4 8-9"/></svg>Faster routes with changes and total journey time</li>
+          <li><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M4 10.5l4 4 8-9"/></svg>Any stop, trips to anywhere, unlimited commutes</li>
+        </ul>
+      </div>
+    </div>
+    <p class="plans-foot">Pro renews monthly through your Apple ID until you cancel. Prices include VAT.</p>
+  </div>
+</section>
+
+<section class="block" id="faq" style="padding-top:40px">
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="eyebrow">Questions</p>
+      <h2>Good to know</h2>
+    </div>
+    <div class="faq">
+      <details open><summary>Where do the times come from?</summary><p>Bus and rail times come from the National Transport Authority's real-time feed (Transport for Ireland), refreshed every minute. Luas times come from TII's Luas forecasting service. When a vehicle isn't reporting live, Commutick shows the timetable and marks it as scheduled.</p></details>
+      <details><summary>Does it work outside Dublin?</summary><p>Yes. Commutick uses the national feed, so it covers bus and rail services across the Republic of Ireland, including Cork, Galway, Limerick and Waterford. Luas is Dublin only, of course.</p></details>
+      <details><summary>Do I need an account?</summary><p>No. There's no sign-up and no email address. Your commutes are stored on your phone.</p></details>
+      <details><summary>What happens to my location?</summary><p>Your location is used only to find stops near you and to tell which commute you're on. It is never sold, shared or used for ads, and it isn't linked to your identity. See the <a href="privacy.html">privacy policy</a> for details.</p></details>
+      <details><summary>How does the free month work?</summary><p>Pro unlocks automatically the first time you open the app. You don't enter any payment details. After 30 days you're back on the free version unless you choose to subscribe for €0.99 a month.</p></details>
+      <details><summary>Is there an Android version?</summary><p>Not yet. Commutick is iPhone only for now, because the Home Screen widget and Lock Screen countdown are built on iOS features.</p></details>
+    </div>
+  </div>
+</section>
+
+<section class="block closing" id="download" style="padding-top:40px">
+  <div class="wrap">
+    <div class="box">
+      <div>
+        <h2>Your next bus: <span id="close-min">4 min</span></h2>
+        <p>Get Commutick on your iPhone and stop refreshing the stop page.</p>
+        <div style="margin-top:28px">
+          <a class="store-btn js-store" href="#download">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.37 12.6c-.02-2.3 1.88-3.4 1.96-3.46-1.07-1.56-2.73-1.78-3.32-1.8-1.41-.14-2.76.83-3.48.83-.72 0-1.82-.81-3-.79-1.54.02-2.96.9-3.76 2.28-1.6 2.78-.41 6.9 1.15 9.16.76 1.1 1.67 2.34 2.86 2.3 1.15-.05 1.58-.74 2.97-.74 1.38 0 1.77.74 2.98.72 1.23-.02 2.01-1.12 2.76-2.23.87-1.28 1.23-2.52 1.25-2.58-.03-.01-2.4-.92-2.42-3.65zM14.1 5.86c.63-.77 1.06-1.83.94-2.89-.91.04-2.01.61-2.66 1.37-.58.67-1.09 1.75-.96 2.79 1.02.08 2.05-.52 2.68-1.27z"/></svg>
+            <span><small class="js-store-small">Download on the</small>App Store</span>
+          </a>
+        </div>
+      </div>
+      <img src="img/icon.png" alt="Commutick app icon">
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div><strong style="color:var(--paper)">Commutick</strong> · Made in Dublin</div>
+    <nav aria-label="Footer">
+      <a href="privacy.html">Privacy</a>
+      <a href="https://www.apple.com/legal/internet-services/itunes/dev/stdeula/" target="_blank" rel="noopener">Terms of Use</a>
+      <span>Support: <span style="user-select:all;color:var(--paper)">hello@commutick.com</span></span>
+    </nav>
+    <p class="credit">Transport data © National Transport Authority and Transport Infrastructure Ireland, used under CC BY 4.0. Commutick is not affiliated with TFI, Dublin Bus, Iarnród Éireann or Luas. iPhone and App Store are trademarks of Apple Inc.</p>
+  </div>
+</footer>
+
+<script>
+// Set this once the app is live, e.g. "https://apps.apple.com/ie/app/commutick/id1234567890"
+const APP_STORE_URL = "";
+
+(function(){
+  document.querySelectorAll('.js-store').forEach(a=>{
+    if(APP_STORE_URL){ a.href = APP_STORE_URL; a.target = "_blank"; a.rel = "noopener"; }
+    else {
+      a.querySelector('.js-store-small').textContent = 'Coming soon to the';
+      if(!a.closest('#download')) a.href = '#download'; else { a.setAttribute('aria-disabled','true'); a.addEventListener('click',e=>e.preventDefault()); }
+    }
+  });
+
+  const nav = document.querySelector('header.nav');
+  addEventListener('scroll',()=>nav.classList.toggle('scrolled',scrollY>10),{passive:true});
+
+  // Example departures board (illustrative, not live)
+  const rows = [
+    {r:'27', d:'JOBSTOWN', m:4},
+    {r:'GRN', d:'BRIDES GLEN', m:7},
+    {r:'151', d:'FOXBOROUGH', m:12},
+    {r:'DART', d:'GREYSTONES', m:16}
+  ];
+  const box = document.getElementById('sign-rows');
+  const fmt = m => m<=0 ? 'DUE' : m+'<small>min</small>';
+  function render(){
+    box.innerHTML = rows.map(x=>`<div class="sign-row${x.m<=0?' flash':''}"><span>${x.r}</span><span class="dest">${x.d}</span><span class="min">${fmt(x.m)}</span></div>`).join('');
+  }
+  render();
+
+  let t = 8*60+12, lockMin = 6, wMin = 11, closeMin = 4;
+  const pad = n => String(n).padStart(2,'0');
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  document.getElementById('act-bar').style.width = '62%';
+  if(reduce) return;
+  setInterval(()=>{
+    t++; const clk = pad(Math.floor(t/60)%24)+':'+pad(t%60);
+    document.getElementById('sign-clock').textContent = clk;
+    document.getElementById('lock-clock').textContent = clk;
+    rows.forEach(x=>{ x.m--; if(x.m < 0){ x.m = 14 + Math.floor(Math.random()*8); } });
+    rows.sort((a,b)=>a.m-b.m); render();
+    lockMin = lockMin<=1 ? 9 : lockMin-1;
+    document.getElementById('act-min').innerHTML = lockMin+'<small> min</small>';
+    document.getElementById('isl-min').textContent = lockMin+' min';
+    document.getElementById('act-bar').style.width = (100 - lockMin*7)+'%';
+    wMin = wMin<=1 ? 12 : wMin-1;
+    document.getElementById('w-min').innerHTML = wMin+'<small>min</small>';
+    closeMin = closeMin<=1 ? 5 : closeMin-1;
+    document.getElementById('close-min').textContent = closeMin===1 ? 'DUE' : closeMin+' min';
+  }, 4000);
+})();
+</script>
+
+</body>
+</html>
